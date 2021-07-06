@@ -3,14 +3,13 @@ const cheerio = require('cheerio')
 const Promise = require('bluebird')
 
 module.exports = class Anime {
-  title // done
-  url // pas besoin
-  releaseDate // timestamp
-  synopsis // plus ou moins done
-  genres // done
+  title
+  releaseDate
+  synopsis
+  genres
   episodes
-  image // done
-  id // plus ou moins done
+  image
+  id
   author
   studio
 
@@ -27,7 +26,7 @@ module.exports = class Anime {
 
     this.releaseDate = $('#col-droit .date').attr('data-time')
     this.studio = $('b[itemprop="publisher"]').text()
-    this.synopsis = $('.description.justify > strong').text()
+    this.synopsis = $('.description.justify > strong').first().text()
     this.author = $('b[itemprop="author"]').text()
 
     const links = $(`[href^="https://www.adkami.com/anime/${this.id}/"]`).filter((x, y) => x != 0 && $(y).text().match(/episode.*vostfr/i)).map((x, y) => $(y).attr('href')).get()
@@ -36,27 +35,20 @@ module.exports = class Anime {
     
 
     // const promises = links.map(l => this.fromPage2(l));
-    Promise.map(links, link => this.fromPage2(link), {concurrency:20}).then(data => {
+    await Promise.map(links, link => this.fromPage2(link), {concurrency:20}).then(data => {
     this.episodes = data
-    const animes = {};
-    animes['title'] = this.title;
-    animes['releaseDate'] = this.releaseDate;
-    animes['synopsis'] = this.synopsis;
-    animes['genre'] = this.genres;
-    animes['episodes'] = this.episodes;
-    animes['image'] = this.image;
-    animes['studio'] = this.studio;
-    animes['id'] = this.id
-      console.log(animes)
-    const fs = require('fs');
-    fs.readFile('anime.json', null, function (err, data) {
-      var json = JSON.parse(data)
-
-      json.push(animes)
-
-      fs.writeFile("anime.json", JSON.stringify(json), () => {})
-    })
+    return this;
+  
     });
+    // const fs = require('fs');
+    // fs.readFile('animu.json', null, function (err, data) {
+    //   var json = JSON.parse(data)
+
+    //   json.push(animes)
+
+    //   fs.writeFile("animu.json", JSON.stringify(json), () => {})
+    // })
+    // });
 
   }
 
@@ -79,6 +71,8 @@ module.exports = class Anime {
           title: title,
           videoLinks: videoLinks
         })
+
+        
       })
 
 
