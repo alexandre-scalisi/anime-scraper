@@ -1,6 +1,7 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
 const Promise = require('bluebird')
+const { empty } = require('cheerio/lib/api/manipulation')
 
 module.exports = class Anime {
   title
@@ -17,7 +18,7 @@ module.exports = class Anime {
     this.id = id;
   }
 
-  async fromPage($) {
+  async getAnimeDatas($) {
     const img = $(`img[src^="https://image.adkami.com/${this.id}"]`)
 
     this.image = img.attr('src');
@@ -28,34 +29,25 @@ module.exports = class Anime {
     this.studio = $('b[itemprop="publisher"]').text()
     this.synopsis = $('.description.justify > strong').first().text()
     this.author = $('b[itemprop="author"]').text()
-
-    const links = $(`[href^="https://www.adkami.com/anime/${this.id}/"]`).filter((x, y) => x != 0 && $(y).text().match(/episode.*vostfr/i)).map((x, y) => $(y).attr('href')).get()
-    
-
-    
-
-    // const promises = links.map(l => this.fromPage2(l));
-    await Promise.map(links, link => this.fromPage2(link), {concurrency:20}).then(data => {
-    this.episodes = data
-    return this;
   
-    });
-    // const fs = require('fs');
-    // fs.readFile('animu.json', null, function (err, data) {
-    //   var json = JSON.parse(data)
+    // get episodes links if episodes are french subbed else return; 
+    const links = $(`[href^="https://www.adkami.com/anime/${this.id}/"]`).
+        filter((x, y) => x != 0 && $(y).text().match(/episode.*vostfr/i))
+        .map((x, y) => $(y)
+        .attr('href'))
+        .get()
 
-    //   json.push(animes)
+    if(links.length < 0)
+      return;
 
-    //   fs.writeFile("animu.json", JSON.stringify(json), () => {})
-    // })
-    // });
-
+    await Promise.map(links, link => this.getEpisodeDatas(link), {concurrency:20}).then(data => this.episodes = data)
   }
 
-  async fromPage2(link) {
 
+  async getEpisodeDatas(link) {
+ 
     return axios.get(link).then((response) => {
-      // Load the web page source code into a cheerio instance
+      
       const $ = cheerio.load(response.data)
 
       const videoLinks = {
@@ -65,19 +57,14 @@ module.exports = class Anime {
       videoLinks['crunchyroll'] = $('[src^="https://www.crunchyroll.com/affiliate_iframeplayer"]').attr('src') || '';
       videoLinks['wakanim'] = $('[src^="https://www.wakanim.tv/fr/v2/catalogue/embeddedplayer"]').attr('src') || '';
       const title = $('.title-header-video').text()
-      // console.log($('.title-header-video').text());
-      return new Promise((res, rej) => {
+    
+      return new Promise((res) => {
         res({
           title: title,
           videoLinks: videoLinks
-        })
-
-        
+        })       
       })
-
-
     })
-
 
   }
 }

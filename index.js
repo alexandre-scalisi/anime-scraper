@@ -1,51 +1,96 @@
 const cheerio = require('cheerio')
 const axios = require('axios')
+const Promise = require('bluebird')
 const Anime = require('./Anime');
-const {
-  first
-} = require('cheerio/lib/api/traversing');
-const filterGenres = ['Magical Girl', 'Shôjo-Ai', 'Yaoi', 'Ecchi', 'Harem', 'Idols', 'Musical', 'Romance', 'Shônen-Ai', 'Tranche de vie', 'Yuri', 'Inceste', 'Triangle Amoureux'];
+
+const filterGenres = ['Magical Girl', 'Shôjo-Ai', 'Yaoi', 'Ecchi', 'Harem', 'Idols', 'Musical',
+             'Romance', 'Shônen-Ai', 'School Life', 'Tranche de vie', 'Yuri', 'Inceste', 'Triangle Amoureux'];
 const animes = [];
+const searchLink = 'https://www.adkami.com/anime';
 
 
-(async function() {
 
-  for(let i = 1; i < 16; i++) {
+
+axios.get(searchLink).then(response => {
+  // I'm using cheerio to query the DOM elements
+  const $ = cheerio.load(response.data)
+
+
+  //get genres list
+  const genres = $("label[for^='genre']").filter((_, g) => !filterGenres.includes($(g).text())).map((_, g) => $(g).text());
+  const fs = require('fs');
+  fs.writeFile("genres.json", JSON.stringify([...genres]), () => {});
+
+  const pageCount = $('a > button').last().text();
+
+  init(pageCount)
+});
+
+async function init(pageCount) {
+  
+
+  // loop through all search pages
+  for(let i = 1; i <= pageCount; i++) {
+
 
   await axios.get(`https://www.adkami.com/video?t=0&page=${i}`).then(async response => {
-  // Load the web page source code into a cheerio instance
-  let $ = cheerio.load(response.data)
-  const links = $('.video-item-list > a').map((i, j) => $(j).attr('href'));
   
-    for(let i = 0; i< links.length; i++) {
-      await axios.get(links[i]).then(async response => {
-        $ = cheerio.load(response.data)
-        const genres = [...$("[itemprop='genre']").map((_, i) => $(i).text())];
-        if (genres.some( a => filterGenres.includes(a)))
-          return;
+    const $ = cheerio.load(response.data)
 
-        let linksCount = 0
-        linksCount += $('[href^="https://animedigitalnetwork.fr/video/"]').length
-        linksCount += $('[src^="https://www.crunchyroll.com/affiliate_iframeplayer"]').length
-        linksCount += $('[src^="https://www.wakanim.tv/fr/v2/catalogue/embeddedplayer"]').length
-        
+    //get all links to linking to an anime on current search page
+    const links = $('.video-item-list > a').map((i, j) => $(j).attr('href'));
+
+    // Promise.map is a method from Bluebird package allowing me to run a limited amount of promises simultaneously
+    await Promise.map(links, link => axios.get(link).
+        then(response => getDatas(response, link), {concurrency: 10})
+        )}
+    )}
   
-        if (linksCount < 1) return;
-          const id = links[i].split('/').slice(-1)[0];
-          let anime = new Anime(id);
-          await axios.get(links[i]).then( async response => {
-            $ = cheerio.load(response.data);
-            await anime.fromPage($)
-            
-          })
-          animes.push(anime);
-          
-          
-        });
-        
-      }
-    })}
-  
+  //convert every Anime class into json string in order to read it in laravel
   const fs = require('fs');
-  fs.writeFile("animu.json", JSON.stringify(animes), () => {});
-})()
+  fs.writeFile("anime.json", JSON.stringify(animes), () => {});
+}
+
+
+async function getDatas(response, link) {
+  const $ = cheerio.load(response.data)
+         
+  if (!validate($)) return;
+  
+  const id = link.split('/').slice(-1)[0];
+  let anime = new Anime(id);
+
+  //fetch anime datas using the id
+  await axios.get(link).then( async response => {
+    const $ = cheerio.load(response.data);
+    await anime.getAnimeDatas($)
+      
+    })
+
+  //wait for all datas to be fetched and then push it into anime array if it has episodes
+  if((anime.episodes.length > 0))
+      animes.push(anime);
+}
+
+
+
+
+
+// I'm filtering some categories and animes with no links to wakanim/adn/crunchyroll
+function validate($) {
+  const genres = [...$("[itemprop='genre']").map((_, i) => $(i).text())];
+  
+  if (genres.some( a => filterGenres.includes(a)))
+    return false;
+ 
+  let linksCount = 0
+  linksCount += $('[href^="https://animedigitalnetwork.fr/video/"]').length
+  linksCount += $('[src^="https://www.crunchyroll.com/affiliate_iframeplayer"]').length
+  linksCount += $('[src^="https://www.wakanim.tv/fr/v2/catalogue/embeddedplayer"]').length
+  
+
+  if (linksCount < 1) return false;
+
+  return true;
+}
+
