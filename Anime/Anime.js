@@ -1,7 +1,6 @@
 const axios = require('axios')
 const cheerio = require('cheerio')
 const Promise = require('bluebird')
-const { empty } = require('cheerio/lib/api/manipulation')
 
 module.exports = class Anime {
   title
@@ -39,7 +38,7 @@ module.exports = class Anime {
 
     if(links.length < 0)
       return;
-
+    
     await Promise.map(links, link => this.getEpisodeDatas(link), {concurrency:20}).then(data => this.episodes = data)
   }
 
@@ -68,3 +67,5 @@ module.exports = class Anime {
 
   }
 }
+
+
