@@ -6,5 +6,11 @@ module.exports = function init($) {
         !filterGenres.includes($(g).text())).
         map((_, g) => $(g).text());
     const fs = require('fs');
-    fs.writeFile("./assets/genres.json", JSON.stringify([...genres]), () => {});
+    fs.writeFile("./assets/genres.json", JSON.stringify([...genres]), (err) => {
+        if(err) { console.log(err); return}
+
+        console.log('-------------------------------------------------------------------------------------')
+        console.log('Fichier JSON contenant la liste des catégories trouvées créé dans /assets/genres.json')
+        console.log('-------------------------------------------------------------------------------------')
+    });
 }

@@ -11,7 +11,7 @@ const animes = [];
 module.exports = async function init(pageCount) {
 
     for(let i = 1; i <= pageCount; i++) {
-  
+      console.log(`${i}/${pageCount}`)
   
       await axios.get(`https://www.adkami.com/video?t=0&page=${i}`).then(async response => {
       
@@ -28,7 +28,15 @@ module.exports = async function init(pageCount) {
       
       //convert every Anime class into json string in order to read it in laravel
       const fs = require('fs');
-      fs.writeFile("./assets/animes.json", JSON.stringify(animes), () => {});
+      fs.writeFile("./assets/animes.json", JSON.stringify(animes), () => {
+        if(err) {console.log(err); return}
+
+        console.log('-------------------------------------------------------------------------------------')
+        console.log('Fichier JSON contenant les infos des animes trouvés créé dans /assets/animes.json')
+        console.log('-------------------------------------------------------------------------------------')
+      });
+      console.log('--------------------')
+      console.log('FIN')
   }
 
 
